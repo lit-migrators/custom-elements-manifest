@@ -39,20 +39,32 @@ export function extractMixinNodes(node) {
 
         /**
          * @example const MyMixin = klass => { class MyMixin extends klass {} return MyMixin;}
+         * @example const MyMixin = klass => { class MyMixin extends klass {} } // no explicit return
          */
         if (body && ts.isBlock(body)) {
           const classDeclaration = body.statements.find(statement => ts.isClassDeclaration(statement));
           const returnStatement = body.statements.find(statement => ts.isReturnStatement(statement));
-          /** Avoid undefined === undefined */
-          if(!(classDeclaration && returnStatement))
+
+          if (!classDeclaration) {
             return;
-          const classDeclarationName = classDeclaration.name?.getText?.();
-          const returnValue = getReturnValue(returnStatement)
-          /**
-           * If the classDeclaration inside the function body has the same name as whats being
-           * returned from the function, consider it a mixin
-           */
-          if (classDeclarationName === returnValue) {
+          }
+
+          // If there's a return statement, validate it matches the class name
+          if (returnStatement) {
+            const classDeclarationName = classDeclaration.name?.getText?.();
+            const returnValue = getReturnValue(returnStatement)
+            /**
+             * If the classDeclaration inside the function body has the same name as whats being
+             * returned from the function, consider it a mixin
+             */
+            if (classDeclarationName === returnValue) {
+              return {
+                mixinFunction: node,
+                mixinClass: classDeclaration
+              }
+            }
+          } else {
+            // No explicit return statement, but there's a class declaration - treat as mixin
             return {
               mixinFunction: node,
               mixinClass: classDeclaration
@@ -81,25 +93,34 @@ export function extractMixinNodes(node) {
 
     /**
      * @example function MyMixin(klass) {class A extends klass {} return A;}
+     * @example function MyMixin(klass) {class A extends klass {}} // no explicit return
      */
     if (ts.isFunctionDeclaration(node)) {
       if (node.body && ts.isBlock(node.body)) {
         const classDeclaration = node.body.statements.find(statement => ts.isClassDeclaration(statement));
         const returnStatement = node.body.statements.find(statement => ts.isReturnStatement(statement));
 
-        /** Avoid undefined === undefined */
-        if(!(classDeclaration && returnStatement))
+        if (!classDeclaration) {
           return;
+        }
 
-        const classDeclarationName = classDeclaration.name?.getText?.();
+        // If there's a return statement, validate it matches the class name
+        if (returnStatement) {
+          const classDeclarationName = classDeclaration.name?.getText?.();
+          const returnValue = getReturnValue(returnStatement)
 
-        const returnValue = getReturnValue(returnStatement)
-
-        /**
-         * If the classDeclaration inside the function body has the same name as whats being
-         * returned from the function, consider it a mixin
-         */
-        if (classDeclarationName === returnValue) {
+          /**
+           * If the classDeclaration inside the function body has the same name as whats being
+           * returned from the function, consider it a mixin
+           */
+          if (classDeclarationName === returnValue) {
+            return {
+              mixinFunction: node,
+              mixinClass: classDeclaration
+            }
+          }
+        } else {
+          // No explicit return statement, but there's a class declaration - treat as mixin
           return {
             mixinFunction: node,
             mixinClass: classDeclaration
